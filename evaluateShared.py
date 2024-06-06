@@ -74,7 +74,7 @@ def loadSolutionFromString(solutionStr):
             return schedules, "Solution format incorrect. Expected all lines to be in format [{load_id}, {load_id}, ...], but got this: " + line
         line = line.replace('[','')
         line = line.replace(']','')
-        line = line.replace('\n','')
+        line = line.strip()
         line = line.replace(' ','')
         splits = line.split(',')
         schedule = []
@@ -93,7 +93,6 @@ def loadCountOrAssignmentError(problem, solutionSchedules):
         
     if len(solutionLoadIDs) != len(problem.loads):
         return "the solution load count is not equal to the problem load count"
-        
     for load in problem.loads:
         if load.id not in solutionLoadIDs:
             return "load " + load.id + " was not assigned to a driver"
