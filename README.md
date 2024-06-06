@@ -6,7 +6,7 @@
 
 python 3.10.4 was used no other versions of python have been tested
 
-`python -m pip install pandas numpy`
+`python -m pip install pandas numpy scipy vrpy networkx`
 
 a requirements file was created from `python.exe -m pip freeze > requirement.txt`
 
@@ -29,7 +29,7 @@ mean run time: 908.5029602050781ms
 
 ### v2.0
 
-vrpy
+vrpy. I referenced a [medium article](referenced https://medium.com/@trentleslie/leveraging-the-vehicle-route-problem-with-pickup-and-dropoff-vrppd-for-optimized-beer-delivery-in-392117d69033) for this solution. 
 
 # Notes
 
