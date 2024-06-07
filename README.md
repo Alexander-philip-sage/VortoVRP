@@ -23,11 +23,17 @@ commit id: a239f07
 
 tag: v1.0
 
-mean cost: 90138.6429881012
+mean cost: 90,138
 
-mean run time: 908.5029602050781ms
+mean run time: 908ms
 
-### v2.0
+adding in an angle sorting by the pickup location relative to the depot we get a slightly improved mean cost at the expense of the mean run time
+
+mean cost: 77,800
+
+mean run time: 1652.ms
+
+### vrpy
 
 vrpy. I referenced a [medium article](https://medium.com/@trentleslie/leveraging-the-vehicle-route-problem-with-pickup-and-dropoff-vrppd-for-optimized-beer-delivery-in-392117d69033) for writing this solution. 
 
@@ -68,6 +74,17 @@ whereas the for-loop method solves problem13 in 0.35s
 
 using time_region.py
 
+INFO:root:load_data: calls 1 total time 0.003 time per call 0.002992
+INFO:root:calc_distances: calls 1 total time 0.001 time per call 0.000997
+INFO:root:create_graph: calls 1 total time 0.005 time per call 0.004987
+INFO:root:vrs_vrpy: calls 1 total time 20.155 time per call 20.154953
+
+you can see that the vrpy package is doing all the damage in compute time
+
+### vrpy initialized
+
+using the for-loop method to initialize the vrpy solver speed up the solver on problem13 from 91s to 75s
+
 # Notes
 
 * using `inputPath = os.path.join (args.problemDir, inputFile)` on line 160 of evaluateShared.py will allow it to run in a more operating system agnostic way rather than hard coding forward or backward slash.
@@ -77,3 +94,5 @@ using time_region.py
 
 # Conclusion
 I was quite surprised that the vrpy package didn't perform better. I did a lot of digging into the documentation, examples on the documentation site, and a medium example usage. I am assuming that the truck can only carry one load from one pickup customer at a time since this is implied in the description, but it isn't explicitly stated. With more time I would try to get the other solvers cplex and gurobi to work, and I might implement a solution with google's or-tools to compare against my other solutions. 
+
+If I had approached it differently: I could have dug into implementing heuristic algorithms my self with the graph I constructed in the vrpy solution.  
