@@ -1,6 +1,7 @@
 # VortoVRP
 2023-10-03 Vorto Algorithmic Challenge
 
+the solution file is sage_vrs.py and runs with the example described in evaluationReadMe.txt `python3 evaluateShared.py --cmd "python3 sage_vrs.py" --problemDir trainingProblems`
 
 ## Env
 
@@ -35,7 +36,7 @@ mean run time: 1652.ms
 
 ### vrpy
 
-vrpy. I referenced a [medium article](https://medium.com/@trentleslie/leveraging-the-vehicle-route-problem-with-pickup-and-dropoff-vrppd-for-optimized-beer-delivery-in-392117d69033) for writing this solution. 
+using the vrpy package. I referenced a [medium article](https://medium.com/@trentleslie/leveraging-the-vehicle-route-problem-with-pickup-and-dropoff-vrppd-for-optimized-beer-delivery-in-392117d69033) for writing this solution. 
 
 **Testing Parameters**
 
