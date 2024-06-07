@@ -151,7 +151,45 @@ def vrs_initialized(loads_path: str) -> None:
         for route in drivers:
             print(route)
 
-#
+
+@timer_func
+def vrs_nearest_next(loads_path: str=None, df: pd.DataFrame=None) -> None:
+    '''build off the previous for loop design but grab the next nearest starting point'''
+    if not loads_path and not df:
+        raise Exception("either loads_path or df are required")
+    if loads_path:
+        df = load_data(loads_path)
+    drivers = []
+    curr_driver = 0
+    distance_matrix=calc_distances(df)
+    need_pickup = np.ones(len(df))
+    current_node = 0
+    while need_pickup.sum() >0:
+        possible_next_node = np.argmin(distance_matrix[current_node,1:1+len(df)])
+        print("from", current_node, "next", possible_next_node)
+        if curr_driver==0:
+            drivers.append([row.iloc[0]])
+            curr_driver = np.linalg.norm(df.iloc[2]-row.iloc[1]) + np.linalg.norm(row.iloc[1]) + np.linalg.norm(row.iloc[2])
+
+    for dfi, row in df.iterrows():
+        ##drive only one route
+        if curr_driver==0:
+            drivers.append([row.iloc[0]])
+            curr_driver = np.linalg.norm(row.iloc[2]-row.iloc[1]) + np.linalg.norm(row.iloc[1]) + np.linalg.norm(row.iloc[2])
+        else:
+            possible_routes = drivers[-1]+ [ row.iloc[0]]
+            new_distance=calculate_distance(df, possible_routes)
+            if new_distance < 12*60:
+                drivers[-1].append(row.iloc[0])
+                curr_driver=new_distance
+            else:
+                drivers.append([row.iloc[0]])
+                curr_driver= np.linalg.norm(row.iloc[2]-row.iloc[1]) + np.linalg.norm(row.iloc[1]) + np.linalg.norm(row.iloc[2])
+
+    for route in drivers:
+        print(route)
+
+
 def vrs(loads_path: str, mode:str='for-loop') -> None:
     '''takes in the path to a space separated txt file with a header. 
     each row of data is int Tuple(float, float) Tuple(float, float)
