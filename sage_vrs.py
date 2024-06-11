@@ -9,7 +9,11 @@ import networkx as nx
 from vrpy import VehicleRoutingProblem
 import logging
 from time_region import timer_func, time_region
+
 logging.getLogger("vrpy").setLevel(logging.ERROR)
+
+MAX_DRIVING = 12*60
+
 def euclidean_distance(p1: Tuple[float], p2:float) -> float:
     '''takes in two x,y points as p1 and p2'''
     #could also use numpy.linalg.norm(a-b) for vectors
@@ -45,21 +49,21 @@ def load_data(loads_path: str) -> pd.DataFrame:
 @timer_func
 def vrs_forloop_build_route(df: pd.DataFrame=None) -> List:
     drivers = []
-    curr_driver = 0
+    curr_distance = 0
     for dfi, row in df.iterrows():
         ##drive only one route
-        if curr_driver==0:
+        if curr_distance==0:
             drivers.append([row.iloc[0]])
-            curr_driver = np.linalg.norm(row.iloc[2]-row.iloc[1]) + np.linalg.norm(row.iloc[1]) + np.linalg.norm(row.iloc[2])
+            curr_distance = np.linalg.norm(row.iloc[2]-row.iloc[1]) + np.linalg.norm(row.iloc[1]) + np.linalg.norm(row.iloc[2])
         else:
             possible_routes = drivers[-1]+ [ row.iloc[0]]
             new_distance=calculate_distance(df, possible_routes)
-            if new_distance < 12*60:
+            if new_distance < MAX_DRIVING:
                 drivers[-1].append(row.iloc[0])
-                curr_driver=new_distance
+                curr_distance=new_distance
             else:
                 drivers.append([row.iloc[0]])
-                curr_driver= np.linalg.norm(row.iloc[2]-row.iloc[1]) + np.linalg.norm(row.iloc[1]) + np.linalg.norm(row.iloc[2])
+                curr_distance= np.linalg.norm(row.iloc[2]-row.iloc[1]) + np.linalg.norm(row.iloc[1]) + np.linalg.norm(row.iloc[2])
     return drivers
 @timer_func
 def vrs_forloop(loads_path: str=None, df: pd.DataFrame=None, sort_angle=True) -> None:
@@ -89,6 +93,10 @@ def create_graph(distance_matrix: np.ndarray, pickup_dropoff: dict):
 
 @timer_func
 def calc_distances(df: pd.DataFrame) -> np.ndarray:
+    '''sets up a distance matrix from every point that exists: Source, pickups, dropoffs, Sink
+    source=sink=depot
+    no arrows can be going into the source or out of the sink. This means setting these values to zero.
+    we set every row of the zero'th column to zero, and every column of the last row to zero'''
     all_addresses = np.concatenate([[np.array([0,0])], np.vstack(pd.concat([df['pickup'], df['dropoff']]).values), [np.array([0,0])]],axis=0)
     distance_matrix = squareform(pdist(all_addresses, metric='euclidean')).astype(np.int32)
     #print("distance_matrix",distance_matrix.shape)
@@ -108,7 +116,7 @@ def vrs_vrpy(loads_path: str) -> None:
     graph = create_graph(distance_matrix, pickup_dropoff)
     prob = VehicleRoutingProblem(graph, load_capacity=1)
     prob.pickup_delivery = True
-    prob.duration = 12*60
+    prob.duration = MAX_DRIVING
     prob.fixed_cost = 500
     sol = prob.solve(time_limit=20, cspy=False, solver='cbc', pricing_strategy ='Exact')
     #print("sol", sol)
@@ -138,7 +146,7 @@ def vrs_initialized(loads_path: str) -> None:
     graph = create_graph(distance_matrix, pickup_dropoff)
     prob = VehicleRoutingProblem(graph, load_capacity=1)
     prob.pickup_delivery = True
-    prob.duration = 12*60
+    prob.duration = MAX_DRIVING
     prob.fixed_cost = 500
     #print(initial_routes)
     #initial_routes = {1: ['Source', 1, 11, 'Sink'], 2: ['Source', 2, 12, 'Sink'], 3: ['Source', 3, 13, 'Sink'], 4: ['Source', 6, 16, 'Sink'], 5: ['Source', 7, 17, 'Sink'], 6: ['Source', 8, 18, 'Sink'], 7: ['Source', 10, 20, 'Sink'], 8: ['Source', 4, 14, 5, 15, 9, 19, 'Sink']}
@@ -151,41 +159,69 @@ def vrs_initialized(loads_path: str) -> None:
         for route in drivers:
             print(route)
 
+@timer_func
+def mark_off_pickup(pickup_index: int, need_pickup: np.ndarray,distance_matrix: np.ndarray ):
+    '''set distance to inf and set need_pickup to 0'''
+    need_pickup -= 1
+    distance_matrix[:,pickup_index]=np.inf
+    return need_pickup
+@timer_func
+def calc_route_distance(route: List[int],ct_pickup_sites: int, distance_matrix: np.ndarray):
+    '''given a list of pickup locations based on their loadNumber, calculate the distance of the route'''
+    distance = 0
+    curr_node = 0 
+    for i, pickup in enumerate(route):
+        distance += distance_matrix[curr_node,pickup]
+        dropoff_index = pickup + ct_pickup_sites
+        distance += distance_matrix[pickup,dropoff_index]
+        curr_node = dropoff_index
+    distance += distance_matrix[dropoff_index,0]
+    return distance
 
 @timer_func
-def vrs_nearest_next(loads_path: str=None, df: pd.DataFrame=None) -> None:
+def vrs_nearest_next(loads_path: str=None, df: pd.DataFrame=None, verbose: bool = False) -> None:
     '''build off the previous for loop design but grab the next nearest starting point'''
+    ##start at some random pickup. then drop it off. Go to the next closest pickup if you can 
+    ##  drop it off in the 12 hour cutoff. repeat with new drivers till done. 
     if not loads_path and not df:
         raise Exception("either loads_path or df are required")
     if loads_path:
         df = load_data(loads_path)
+    ct_pickup_sites = len(df)
     drivers = []
-    curr_driver = 0
-    distance_matrix=calc_distances(df)
-    need_pickup = np.ones(len(df))
+    curr_distance = 0
+    distance_matrix=calc_distances(df).astype(np.float32)
+    distance_matrix_orig = distance_matrix.copy()
+    need_pickup = len(df)
     current_node = 0
-    while need_pickup.sum() >0:
-        possible_next_node = np.argmin(distance_matrix[current_node,1:1+len(df)])
-        print("from", current_node, "next", possible_next_node)
-        if curr_driver==0:
-            drivers.append([row.iloc[0]])
-            curr_driver = np.linalg.norm(df.iloc[2]-row.iloc[1]) + np.linalg.norm(row.iloc[1]) + np.linalg.norm(row.iloc[2])
-
-    for dfi, row in df.iterrows():
-        ##drive only one route
-        if curr_driver==0:
-            drivers.append([row.iloc[0]])
-            curr_driver = np.linalg.norm(row.iloc[2]-row.iloc[1]) + np.linalg.norm(row.iloc[1]) + np.linalg.norm(row.iloc[2])
+    distances_driven = []
+    if verbose:
+       print("distance matrix shape", distance_matrix.shape)
+    while need_pickup >0:
+        #look for the closest pickup
+        possible_next_node = np.argmin(distance_matrix[current_node,1:ct_pickup_sites+1])+1
+        if verbose:
+            print("from", current_node, "next", possible_next_node)
+            print("looking for lowest distance", distance_matrix[current_node,1:ct_pickup_sites+1])
+            print("curr_distance", curr_distance)
+        if curr_distance==0:
+            drivers.append([possible_next_node])
+            curr_distance = calc_route_distance(drivers[-1],ct_pickup_sites, distance_matrix_orig)
+            need_pickup = mark_off_pickup(possible_next_node, need_pickup,distance_matrix )
+            current_node = possible_next_node
         else:
-            possible_routes = drivers[-1]+ [ row.iloc[0]]
-            new_distance=calculate_distance(df, possible_routes)
-            if new_distance < 12*60:
-                drivers[-1].append(row.iloc[0])
-                curr_driver=new_distance
+            #check if the order can be added to current route plan
+            possible_new_dist = calc_route_distance(drivers[-1]+[possible_next_node],ct_pickup_sites, distance_matrix_orig)
+            if possible_new_dist < MAX_DRIVING:
+                curr_distance = possible_new_dist
+                drivers[-1].append(possible_next_node)
+                need_pickup = mark_off_pickup(possible_next_node, need_pickup,distance_matrix )
+                current_node = possible_next_node
             else:
-                drivers.append([row.iloc[0]])
-                curr_driver= np.linalg.norm(row.iloc[2]-row.iloc[1]) + np.linalg.norm(row.iloc[1]) + np.linalg.norm(row.iloc[2])
-
+                distances_driven.append(curr_distance)
+                curr_distance=0
+                current_node = 0 
+    #print("score", 500*len(drivers) + int(sum(distances_driven)))
     for route in drivers:
         print(route)
 
@@ -200,12 +236,14 @@ def vrs(loads_path: str, mode:str='for-loop') -> None:
         vrs_forloop(loads_path)
     elif mode=='initialized':
         vrs_initialized(loads_path)
+    elif mode=='nearest':
+        vrs_nearest_next(loads_path)
 if __name__=='__main__':
     parser = argparse.ArgumentParser(prog="vehicle_routing_solver" , description = "Pass in the path to the txt file with the loads to pickup", 
                                     )
     parser.add_argument('loads_path', help="path to the txt file with loads to pickup") 
     parser.add_argument('-m', '--mode', help='which solver algorithm to use: for-loop, initialized, or vrpy',
-                        default='for-loop')
+                        default='nearest')
     args = parser.parse_args()
     vrs(args.loads_path, mode=args.mode)
     #time_region.log_summary()
