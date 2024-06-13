@@ -85,6 +85,13 @@ you can see that the vrpy package is doing all the damage in compute time
 
 using the for-loop method to initialize the vrpy solver speed up the solver on problem13 from 91s to 75s
 
+### nearest next (done after 48 hour deadline)
+
+always looking for the next pickup location based on whatever is closest to where it is. If pickup up the next delivery will run over time, they return to the depot. This got a slightly lower mean cost than the for loop algo, but still ran pretty slowly. 
+
+mean cost: 74,283
+mean run time: 1,928ms
+
 # Notes
 
 * using `inputPath = os.path.join (args.problemDir, inputFile)` on line 160 of evaluateShared.py will allow it to run in a more operating system agnostic way rather than hard coding forward or backward slash.

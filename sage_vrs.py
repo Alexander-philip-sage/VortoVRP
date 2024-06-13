@@ -98,11 +98,37 @@ def calc_distances(df: pd.DataFrame) -> np.ndarray:
     no arrows can be going into the source or out of the sink. This means setting these values to zero.
     we set every row of the zero'th column to zero, and every column of the last row to zero'''
     all_addresses = np.concatenate([[np.array([0,0])], np.vstack(pd.concat([df['pickup'], df['dropoff']]).values), [np.array([0,0])]],axis=0)
-    distance_matrix = squareform(pdist(all_addresses, metric='euclidean')).astype(np.int32)
+    distance_matrix = squareform(pdist(all_addresses, metric='euclidean')) #.astype(np.int32)
     #print("distance_matrix",distance_matrix.shape)
     distance_matrix[:,0] = 0
     distance_matrix[-1,:] = 0
     return distance_matrix
+
+def location_lookup(df: pd.DataFrame, dm_i: int):
+    '''takes in the index from the distance matrix and grabs the location'''
+    if dm_i==0 or dm_i==2*len(df)+1:
+        ret =np.array([0,0])
+    elif dm_i>len(df):
+        dm_i -=len(df)
+        row_data = df[df['loadNumber']==dm_i]
+        dropoff = row_data.iloc[0,2]
+        ret= dropoff
+    else:
+        row_data = df[df['loadNumber']==dm_i]
+        pickup = row_data.iloc[0,1]
+        ret= pickup
+    #print(dm_i, ret)
+    return ret
+def check_distance_matrix(df: pd.DataFrame, distance_matrix: np.ndarray):
+    for i in range(distance_matrix.shape[0]-1):
+        for j in range(1,distance_matrix.shape[1]):
+            if i!=j:
+                from_pos = location_lookup(df, i)
+                to_pos =  location_lookup(df, j)
+                df_distance = np.linalg.norm(to_pos-from_pos)
+                if abs(df_distance-distance_matrix[i,j])>1:
+                    print(i,j,"from", from_pos, "to", to_pos)
+                    print("df distance", df_distance, "distance_matrix",distance_matrix[i,j]) 
 
 @timer_func
 def vrs_vrpy(loads_path: str) -> None:
@@ -172,10 +198,12 @@ def calc_route_distance(route: List[int],ct_pickup_sites: int, distance_matrix: 
     curr_node = 0 
     for i, pickup in enumerate(route):
         distance += distance_matrix[curr_node,pickup]
+        assert distance_matrix[curr_node,pickup] >0
         dropoff_index = pickup + ct_pickup_sites
         distance += distance_matrix[pickup,dropoff_index]
         curr_node = dropoff_index
-    distance += distance_matrix[dropoff_index,0]
+    assert distance_matrix[dropoff_index,distance_matrix.shape[1]-1]>0, f"dropoff {dropoff_index}"
+    distance += distance_matrix[dropoff_index,distance_matrix.shape[1]-1]
     return distance
 
 @timer_func
@@ -190,7 +218,9 @@ def vrs_nearest_next(loads_path: str=None, df: pd.DataFrame=None, verbose: bool 
     ct_pickup_sites = len(df)
     drivers = []
     curr_distance = 0
-    distance_matrix=calc_distances(df).astype(np.float32)
+    distance_matrix=calc_distances(df)
+    #check_distance_matrix(df, distance_matrix)
+
     distance_matrix_orig = distance_matrix.copy()
     need_pickup = len(df)
     current_node = 0
@@ -219,6 +249,8 @@ def vrs_nearest_next(loads_path: str=None, df: pd.DataFrame=None, verbose: bool 
                 current_node = possible_next_node
             else:
                 distances_driven.append(curr_distance)
+                if verbose:
+                    print("driver", len(drivers), "distance", curr_distance)
                 curr_distance=0
                 current_node = 0 
     #print("score", 500*len(drivers) + int(sum(distances_driven)))
@@ -243,7 +275,7 @@ if __name__=='__main__':
                                     )
     parser.add_argument('loads_path', help="path to the txt file with loads to pickup") 
     parser.add_argument('-m', '--mode', help='which solver algorithm to use: for-loop, initialized, or vrpy',
-                        default='nearest')
+                        default='for-loop')
     args = parser.parse_args()
     vrs(args.loads_path, mode=args.mode)
     #time_region.log_summary()
