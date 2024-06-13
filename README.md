@@ -1,6 +1,9 @@
 # VortoVRP
-2023-10-03 Vorto Algorithmic Challenge
+2023-10-03 Vorto Algorithmic Challenge. This is a solution to the vehicle routing problem pickup-dropoff. Details on the problem statement have been intentionally left out since this is usually preferred by companies for their algorithm challenges. 
 
+the solution file is sage_vrs.py and runs with the example described in evaluationReadMe.txt 
+
+`python3 evaluateShared.py --cmd "python3 sage_vrs.py" --problemDir trainingProblems`
 
 ## Env
 
@@ -12,7 +15,7 @@ a requirements file was created from `python.exe -m pip freeze > requirement.txt
 
 # Status
 
-The code runs on the training problems provided. It has not been optimized by a smart algorithm like a savings algorithm. It currently uses a naive single for-loop.
+The code runs on the training problems provided. The best solution I tested was my initial naive for-loop design.
 
 ## Running Versions
 
@@ -35,7 +38,7 @@ mean run time: 1652.ms
 
 ### vrpy
 
-vrpy. I referenced a [medium article](https://medium.com/@trentleslie/leveraging-the-vehicle-route-problem-with-pickup-and-dropoff-vrppd-for-optimized-beer-delivery-in-392117d69033) for writing this solution. 
+using the vrpy package. I referenced a [medium article](https://medium.com/@trentleslie/leveraging-the-vehicle-route-problem-with-pickup-and-dropoff-vrppd-for-optimized-beer-delivery-in-392117d69033) for writing this solution. 
 
 **Testing Parameters**
 
@@ -83,7 +86,7 @@ you can see that the vrpy package is doing all the damage in compute time
 
 ### vrpy initialized
 
-using the for-loop method to initialize the vrpy solver speed up the solver on problem13 from 91s to 75s
+using the for-loop method to initialize the vrpy solver sped up the solver on problem13 from 91s to 75s
 
 ### nearest next (done after 48 hour deadline)
 
